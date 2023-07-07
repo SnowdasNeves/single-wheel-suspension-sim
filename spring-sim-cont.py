@@ -62,20 +62,25 @@ def create_road(dx, n_bumps):
     :param bump_center: center of the bump to be used in the current iteration
     :return: array containing the coordenates of the road surface
     """
-    road_surface = np.zeros((int(SIM_DISTANCE / dx) + 1, 2))
+    v_ms = velocity_in_ms(v_kmh)
+    dt, sim_t = sim_time(v_ms, dx)
+    road_surface = np.zeros((int(sim_t / dt) + 1, 2))
+    t = 0
     x = 0
     list_position = 0
     if n_bumps == 0:
-        while x <= SIM_DISTANCE:
-            road_surface[list_position, 0] = x
+        while t <= sim_t:
+            road_surface[list_position, 0] = t
             x += dx
+            t += dt
             list_position += 1
     else:
-        while x <= SIM_DISTANCE:
-            road_surface[list_position, 0] = x
+        while t <= sim_t:
+            road_surface[list_position, 0] = t
             bump_center = used_bump(x)
             road_surface[list_position, 1] = solve_position_equation(x, bump_center)
             x += dx
+            t += dt
             list_position += 1
     return road_surface
 
@@ -125,9 +130,14 @@ def plot_road_surface(road_surface, wheel_position):
     :param wheel_position: numpy array with the position of the wheel center
     :param road_surface: numpy array with the position of the road surface
     """
-    plt.plot(road_surface[:, 0], road_surface[:, 1], "r--", label="Road surface")
-    plt.plot(wheel_position[:, 0], wheel_position[:, 1], "b", label="Wheel position")
-    plt.xlabel("Distance (m)")
+    v_ms = velocity_in_ms(v_kmh)
+    dt, sim_t = sim_time(v_ms, dx)
+    time = np.arange(0, sim_t + dt, dt)
+    # plt.plot(road_surface[:, 0], road_surface[:, 1], "r--", label="Road surface xy")
+    # plt.plot(wheel_position[:, 0], wheel_position[:, 1], "b", label="Wheel position xy")
+    plt.plot(time, road_surface[:, 1], "r--", label="Road surface")
+    plt.plot(time, wheel_position[:, 1], "b", label="Wheel position")
+    plt.xlabel("Time (s)")
     plt.ylabel("Vertical position (m)")
     plt.title("Road surface and Wheel position")
     plt.legend()

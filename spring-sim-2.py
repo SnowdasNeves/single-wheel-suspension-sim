@@ -151,6 +151,8 @@ def simulate(road_surface):
     y_car[0] = y_car0
     v_car[0] = v_car0
 
+    # Iterates through dt and calculates the displacement of the car
+
     for i in range(1, int(sim_t / dt) + 1):
         v_wheel[i - 1] = (y_wheel[i] - y_wheel[i - 1]) / dt
 
@@ -161,6 +163,13 @@ def simulate(road_surface):
         v_car[i] = v_car[i - 1] + a_car * dt
 
         y_car[i] = y_car[i - 1] + v_car[i] * dt
+
+        # Restricts string to max and min lengths
+
+        if y_car[i] > y_wheel[i] + (SPRING_MAX - SPRING_EQ):
+            y_car[i] = y_wheel[i] + (SPRING_MAX - SPRING_EQ)
+        if y_car[i] < y_wheel[i] - (SPRING_EQ - SPRING_MIN):
+            y_car[i] = y_wheel[i] - (SPRING_EQ - SPRING_MIN)
     return y_car
 
 
@@ -208,7 +217,7 @@ def plot_spring_compression(spring_compression):
     plt.plot(time, spring_compression, "m", label="Spring compression")
     plt.xlabel("Time (s)")
     plt.ylabel("Vertical position (m)")
-    plt.title("Spring compression, eq. around 0.442 (m)")
+    plt.title("Spring compression, eq. around 0.442 m")
     plt.legend()
     plt.grid(True)
     plt.show()

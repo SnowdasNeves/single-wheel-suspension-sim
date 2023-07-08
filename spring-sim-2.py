@@ -9,9 +9,10 @@ WHEEL_R = 0.329
 WHEEL_MASS = 23
 CAR_MASS = 350
 SPRING_K = 60000
-SPRING_DAMPING = 10000
+SPRING_DAMPING = 1000
 SPRING_MAX = 1
 SPRING_MIN = 0.2
+SPRING_EQ = 0.442
 BUMP_R = 0.7
 BUMP_CENTER_1 = 3
 BUMP_CENTER_2 = 6
@@ -23,7 +24,7 @@ SIM_DISTANCE = 15
 
 v_kmh = 1
 dx = 0.001
-n_bumps = 0
+n_bumps = 1
 
 ### INITIAL CALCULATIONS ###
 
@@ -134,15 +135,28 @@ v_car0 = 0.0
 
 
 def simulate(road_surface):
+    """
+    Uses the Euler-Cromer method to simulate the displacement of the car given
+    the wheel displacement and system characteristics.
+
+    :param road_surface: array containing the coordenates of the road surface
+    :return: vertical position of the center of the car
+    """
     y_wheel = road_surface[:, 1]
+    v_wheel = np.zeros_like(y_wheel)
     y_car = np.zeros_like(y_wheel)
     v_car = np.zeros_like(y_wheel)
 
+    v_wheel[0] = (y_wheel[1] - y_wheel[0]) / dt
     y_car[0] = y_car0
     v_car[0] = v_car0
 
     for i in range(1, int(sim_t / dt) + 1):
-        a_car = -SPRING_K / CAR_MASS * (y_car[i - 1] - y_wheel[i - 1])
+        v_wheel[i - 1] = (y_wheel[i] - y_wheel[i - 1]) / dt
+
+        a_car = -SPRING_K / CAR_MASS * (
+            y_car[i - 1] - y_wheel[i - 1]
+        ) - SPRING_DAMPING / CAR_MASS * (v_car[i - 1] - v_wheel[i - 1])
 
         v_car[i] = v_car[i - 1] + a_car * dt
 
@@ -153,7 +167,7 @@ def simulate(road_surface):
 ### PLOTTING DATA ###
 
 
-def plot_road_surface(road_surface, wheel_position):
+def plot_road_surface(road_surface, wheel_position, y_car):
     """
     Plots wheel position and road surface relative to travel time.
 
@@ -161,20 +175,11 @@ def plot_road_surface(road_surface, wheel_position):
     :param road_surface: numpy array with the position of the road surface
     """
     plt.plot(time, road_surface[:, 1], "r--", label="Road surface")
-    plt.plot(time, wheel_position[:, 1], "b", label="Wheel position")
-    plt.xlabel("Time (s)")
-    plt.ylabel("Vertical position (m)")
-    plt.title("Road surface and Wheel position")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-
-def plot_car_displacement(y_car):
+    plt.plot(time, wheel_position[:, 1], "b", label="Wheel displacement")
     plt.plot(time, y_car, "g", label="Car displacement")
     plt.xlabel("Time (s)")
     plt.ylabel("Vertical position (m)")
-    plt.title("Road surface and Wheel position")
+    plt.title("Road surface and displacements")
     plt.legend()
     plt.grid(True)
     plt.show()
@@ -184,6 +189,5 @@ if __name__ == "__main__":
     road_surface = create_road(dx, n_bumps)
     wheel_position = np.copy(road_surface)
     wheel_position[:, 1] = road_surface[:, 1] + WHEEL_R
-    y_car = simulate(road_surface)
-    # plot_road_surface(road_surface, wheel_position)
-    plot_car_displacement(y_car)
+    y_car = simulate(road_surface) + WHEEL_R + SPRING_EQ
+    plot_road_surface(road_surface, wheel_position, y_car)

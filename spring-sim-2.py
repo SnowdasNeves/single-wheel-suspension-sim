@@ -18,11 +18,11 @@ BUMP_CENTER_1 = 3
 BUMP_CENTER_2 = 6
 BUMP_CENTER_3 = 9
 BUMP_DISTANCE_TO_SURFACE = 0.5
-SIM_DISTANCE = 15
+SIM_DISTANCE = 65
 
 ### ROAD SIMULATION PARAMETERS ###
 
-v_kmh = 1
+v_kmh = 20
 dx = 0.001
 n_bumps = 1
 
@@ -164,15 +164,29 @@ def simulate(road_surface):
     return y_car
 
 
+def spring_compression(y_car, wheel_position):
+    """
+    Calculates the length of the spring at each time step.
+
+    :param y_car: vertical position of the center of the car
+    :param wheel_position: numpy array with the position of the wheel center
+    :return: spring length
+    """
+    wheel_center = wheel_position[:, 1]
+    spring_compression = y_car - wheel_center
+    return spring_compression
+
+
 ### PLOTTING DATA ###
 
 
-def plot_road_surface(road_surface, wheel_position, y_car):
+def plot_displacements(road_surface, wheel_position, y_car):
     """
-    Plots wheel position and road surface relative to travel time.
+    Plots wheel position, road surface and car displacement relative to travel time.
 
     :param wheel_position: numpy array with the position of the wheel center
     :param road_surface: numpy array with the position of the road surface
+    :param y_car: vertical position of the center of the car
     """
     plt.plot(time, road_surface[:, 1], "r--", label="Road surface")
     plt.plot(time, wheel_position[:, 1], "b", label="Wheel displacement")
@@ -185,9 +199,26 @@ def plot_road_surface(road_surface, wheel_position, y_car):
     plt.show()
 
 
+def plot_spring_compression(spring_compression):
+    """
+    Plots spring compression.
+
+    :param spring_compression: spring length
+    """
+    plt.plot(time, spring_compression, "m", label="Spring compression")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Vertical position (m)")
+    plt.title("Spring compression, eq. around 0.442 (m)")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
 if __name__ == "__main__":
     road_surface = create_road(dx, n_bumps)
     wheel_position = np.copy(road_surface)
     wheel_position[:, 1] = road_surface[:, 1] + WHEEL_R
     y_car = simulate(road_surface) + WHEEL_R + SPRING_EQ
-    plot_road_surface(road_surface, wheel_position, y_car)
+    spring_compression = spring_compression(y_car, wheel_position)
+    plot_displacements(road_surface, wheel_position, y_car)
+    plot_spring_compression(spring_compression)

@@ -9,8 +9,10 @@ WHEEL_R = 0.329
 WHEEL_MASS = 23
 CAR_MASS = 350
 SPRING_K = 60000
+SPRING_DAMPING = 1500
 SPRING_MAX = 1
 SPRING_MIN = 0.2
+TYRE_K = 70000
 BUMP_R = 0.7
 BUMP_CENTER_1 = 3
 BUMP_CENTER_2 = 6
@@ -22,7 +24,7 @@ SIM_DISTANCE = 15
 
 v_kmh = 1
 dx = 0.001
-n_bumps = 0
+n_bumps = 3
 
 ### INITIAL CALCULATIONS ###
 
@@ -110,7 +112,7 @@ def solve_position_equation(x, bump_center):
     :param bump_center: center of the bump to be used in the current iteration
     :return: y position
     """
-    eq_discriminant = 0.49 - (x - bump_center) ** 2
+    eq_discriminant = BUMP_R**2 - (x - bump_center) ** 2
     if eq_discriminant >= 0:
         if np.sqrt(eq_discriminant) - 0.5 > 0:
             return np.sqrt(eq_discriminant) - 0.5
@@ -120,23 +122,44 @@ def solve_position_equation(x, bump_center):
         return 0
 
 
+### EULER-CROMER SPRING SIMULATION ###
+
+v_ms = velocity_in_ms(v_kmh)
+dt, sim_t = sim_time(v_ms, dx)
+time = np.arange(0, sim_t + dt, dt)
+
+
+def simulation(wheel_displacement):
+    car_displacement = np.zeros(int(sim_t / dt) + 1)
+    wheel_velocity = np.zeros(int(sim_t / dt) + 1)
+    car_velocity = np.zeros(int(sim_t / dt) + 1)
+    wheel_displacement[0] = 0
+    car_displacement[0] = 0
+    wheel_velocity[0] = 0
+    car_velocity[0] = 0
+    for i in range(1, int(sim_t / dt) + 1):
+        spring_force = SPRING_K * (car_displacement[i - 1] - wheel_displacement[i - 1])
+        spring_damping = SPRING_DAMPING * (car_velocity[i - 1] - wheel_velocity[i - 1])
+        net_force = spring_force + spring_damping
+        car_accelaration = net_force / CAR_MASS
+        car_velocity[i] = car_velocity[i - 1] + car_accelaration * dt
+        car_displacement[i] = car_displacement[i - 1] + car_velocity[i] * dt
+    return car_displacement
+
+
 ### PLOTTING DATA ###
 
 
-def plot_road_surface(road_surface, wheel_position):
+def plot_road_surface(road_surface, wheel_position, car_displacement):
     """
     Plots wheel position and road surface relative to travel time.
 
     :param wheel_position: numpy array with the position of the wheel center
     :param road_surface: numpy array with the position of the road surface
     """
-    v_ms = velocity_in_ms(v_kmh)
-    dt, sim_t = sim_time(v_ms, dx)
-    time = np.arange(0, sim_t + dt, dt)
-    # plt.plot(road_surface[:, 0], road_surface[:, 1], "r--", label="Road surface xy")
-    # plt.plot(wheel_position[:, 0], wheel_position[:, 1], "b", label="Wheel position xy")
     plt.plot(time, road_surface[:, 1], "r--", label="Road surface")
     plt.plot(time, wheel_position[:, 1], "b", label="Wheel position")
+    plt.plot(time, car_displacement, "g--")
     plt.xlabel("Time (s)")
     plt.ylabel("Vertical position (m)")
     plt.title("Road surface and Wheel position")
@@ -149,4 +172,5 @@ if __name__ == "__main__":
     road_surface = create_road(dx, n_bumps)
     wheel_position = np.copy(road_surface)
     wheel_position[:, 1] = road_surface[:, 1] + WHEEL_R
-    plot_road_surface(road_surface, wheel_position)
+    car_displacement = simulation(wheel_position)
+    plot_road_surface(road_surface, wheel_position, car_displacement)

@@ -22,7 +22,7 @@ SIM_DISTANCE = 15
 
 v_kmh = 1
 dx = 0.001
-n_bumps = 0
+n_bumps = 1
 
 ### INITIAL CALCULATIONS ###
 
@@ -105,7 +105,7 @@ def solve_position_equation(x, bump_center):
     :param bump_center: center of the bump to be used in the current iteration
     :return: y position
     """
-    eq_discriminant = 0.49 - (x - bump_center) ** 2
+    eq_discriminant = BUMP_R**2 - (x - bump_center) ** 2
     if eq_discriminant >= 0:
         if np.sqrt(eq_discriminant) - 0.5 > 0:
             return np.sqrt(eq_discriminant) - 0.5

@@ -20,6 +20,8 @@ BUMP_CENTER_3 = 9
 BUMP_DISTANCE_TO_SURFACE = 0.5
 SIM_DISTANCE = 65
 
+GRAVITY_ACC = -9.81
+
 ### ROAD SIMULATION PARAMETERS ###
 
 v_kmh = 20
@@ -144,17 +146,28 @@ def simulate(road_surface):
     """
     y_wheel = road_surface[:, 1]
     v_wheel = np.zeros_like(y_wheel)
+    a_wheel = np.zeros_like(y_wheel)
+    f_wheel_spring = np.zeros_like(y_wheel)
+    f_ground = np.zeros_like(y_wheel)
     y_car = np.zeros_like(y_wheel)
     v_car = np.zeros_like(y_wheel)
+
+    gravity = (CAR_MASS + WHEEL_MASS) * GRAVITY_ACC
 
     v_wheel[0] = (y_wheel[1] - y_wheel[0]) / dt
     y_car[0] = y_car0
     v_car[0] = v_car0
+    f_ground[0] = gravity
 
     # Iterates through dt and calculates the displacement of the car
 
     for i in range(1, int(sim_t / dt) + 1):
-        v_wheel[i - 1] = (y_wheel[i] - y_wheel[i - 1]) / dt
+        v_wheel[i] = (y_wheel[i] - y_wheel[i - 1]) / dt
+
+        a_wheel[i] = (v_wheel[i] - v_wheel[i - 1]) / dt
+
+        f_wheel_spring[i] = -SPRING_K * y_wheel[i]
+        f_ground[i] = gravity + f_wheel_spring[i]
 
         a_car = -SPRING_K / CAR_MASS * (
             y_car[i - 1] - y_wheel[i - 1]
@@ -170,7 +183,7 @@ def simulate(road_surface):
             y_car[i] = y_wheel[i] + (SPRING_MAX - SPRING_EQ)
         if y_car[i] < y_wheel[i] - (SPRING_EQ - SPRING_MIN):
             y_car[i] = y_wheel[i] - (SPRING_EQ - SPRING_MIN)
-    return y_car
+    return y_car, f_ground
 
 
 def spring_compression(y_car, wheel_position):
@@ -196,6 +209,7 @@ def plot_displacements(road_surface, wheel_position, y_car):
     :param wheel_position: numpy array with the position of the wheel center
     :param road_surface: numpy array with the position of the road surface
     :param y_car: vertical position of the center of the car
+    :return: graph of road, wheel and car positions over time
     """
     plt.plot(time, road_surface[:, 1], "r--", label="Road surface")
     plt.plot(time, wheel_position[:, 1], "b", label="Wheel displacement")
@@ -210,9 +224,11 @@ def plot_displacements(road_surface, wheel_position, y_car):
 
 def plot_spring_compression(spring_compression):
     """
-    Plots spring compression.
+    Plots spring compression. The lower the value in yy, the more compressed the
+    spring is.
 
     :param spring_compression: spring length
+    :return: graph of spring length over time
     """
     plt.plot(time, spring_compression, "m", label="Spring compression")
     plt.xlabel("Time (s)")
@@ -223,11 +239,32 @@ def plot_spring_compression(spring_compression):
     plt.show()
 
 
+def plot_force(f_ground):
+    """
+    Plots the force applied by the wheel on the ground.
+
+    :param force: force applied to the ground on each iteration
+    :return: graph of force applied over time
+    """
+    plt.plot(time, f_ground, "c", label="Force applied")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Force (N)")
+    plt.title("Force applied on the ground")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
+### PROGRAM INITIALIZATION ###
+
+
 if __name__ == "__main__":
     road_surface = create_road(dx, n_bumps)
     wheel_position = np.copy(road_surface)
     wheel_position[:, 1] = road_surface[:, 1] + WHEEL_R
-    y_car = simulate(road_surface) + WHEEL_R + SPRING_EQ
+    y_car, f_ground = simulate(road_surface)
+    y_car += WHEEL_R + SPRING_EQ
     spring_compression = spring_compression(y_car, wheel_position)
     plot_displacements(road_surface, wheel_position, y_car)
     plot_spring_compression(spring_compression)
+    plot_force(f_ground)

@@ -9,7 +9,7 @@ WHEEL_R = 0.329
 WHEEL_MASS = 23
 CAR_MASS = 350
 SPRING_K = 60000
-SPRING_DAMPING = 3929.73
+SPRING_DAMPING = 3929.73  # For critical damping
 SPRING_MAX = 1
 SPRING_MIN = 0.2
 SPRING_EQ = 0.442
@@ -278,34 +278,13 @@ def plot_force(f_ground):
 
 
 if __name__ == "__main__":
-    # Tests what is the damping coefficient that minimizes stabilization time
-    # using 1 bump
-
-    road_surface = create_road(dx, 1)
-    wheel_position = np.copy(road_surface)
-    wheel_position[:, 1] = road_surface[:, 1] + WHEEL_R
-
-    spring_damping = np.arange(100.0, 100000.0, 100.0)
-    best_damping = None
-    low_stabilization_time = float("inf")
-    for i in spring_damping:
-        y_car, f_ground = simulate(road_surface, i)
-        y_car += WHEEL_R + SPRING_EQ
-        spring_comp = spring_compression(y_car, wheel_position)
-
-        stabilization_time = stabilization(spring_comp)
-
-        if best_damping == None or stabilization_time < low_stabilization_time:
-            best_damping = i
-            low_stabilization_time = stabilization_time
-
     # Plots data using the best damping coefficient and the selected number of bumps
 
-    print("Best damping coefficient:", best_damping, "Ns/m")
+    print("Best damping coefficient:", SPRING_DAMPING, "Ns/m")
     road_surface = create_road(dx, n_bumps)
     wheel_position = np.copy(road_surface)
     wheel_position[:, 1] = road_surface[:, 1] + WHEEL_R
-    y_car, f_ground = simulate(road_surface, best_damping)
+    y_car, f_ground = simulate(road_surface, SPRING_DAMPING)
     y_car += WHEEL_R + SPRING_EQ
     spring_compression = spring_compression(y_car, wheel_position)
     plot_displacements(road_surface, wheel_position, y_car)

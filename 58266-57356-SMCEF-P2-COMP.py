@@ -8,8 +8,9 @@ import matplotlib.pyplot as plt
 WHEEL_R = 0.329
 WHEEL_MASS = 23
 CAR_MASS = 350
+TIRE_K = 191000
 SPRING_K = 60000
-SPRING_DAMPING = 3929.73  # For critical damping
+SPRING_DAMPING = 8000  # For critical damping
 SPRING_MAX = 1
 SPRING_MIN = 0.2
 SPRING_EQ = 0.442
@@ -24,9 +25,9 @@ GRAVITY_ACC = -9.81
 
 ### ROAD SIMULATION PARAMETERS ###
 
-v_kmh = 1
+v_kmh = 20
 dx = 0.001
-n_bumps = 1
+n_bumps = 3
 
 ### INITIAL CALCULATIONS ###
 
@@ -130,13 +131,15 @@ v_ms = velocity_in_ms(v_kmh)
 dt, sim_t = sim_time(v_ms, dx)
 time = np.arange(0, sim_t + dt, dt)
 
+y_wheel0 = 0.0
+v_wheel0 = 0.0
 y_car0 = 0.0
 v_car0 = 0.0
 
 ### SIMULATION FUNCTIONS ###
 
 
-def simulate(road_surface, spring_damping):
+def simulate(road_surface, spring_damping, tire_k):
     """
     Uses the Euler-Cromer method to simulate the displacement of the car given
     the wheel displacement and system characteristics.
@@ -144,17 +147,18 @@ def simulate(road_surface, spring_damping):
     :param road_surface: array containing the coordenates of the road surface
     :return: vertical position of the center of the car
     """
-    y_wheel = road_surface[:, 1]
-    v_wheel = np.zeros_like(y_wheel)
-    a_wheel = np.zeros_like(y_wheel)
-    f_wheel_spring = np.zeros_like(y_wheel)
-    f_ground = np.zeros_like(y_wheel)
-    y_car = np.zeros_like(y_wheel)
-    v_car = np.zeros_like(y_wheel)
+    y_road = road_surface[:, 1]
+    y_wheel = np.zeros_like(y_road)
+    v_wheel = np.zeros_like(y_road)
+    y_car = np.zeros_like(y_road)
+    v_car = np.zeros_like(y_road)
+    f_wheel_spring = np.zeros_like(y_road)
+    f_ground = np.zeros_like(y_road)
 
     gravity = (CAR_MASS + WHEEL_MASS) * GRAVITY_ACC
 
-    v_wheel[0] = (y_wheel[1] - y_wheel[0]) / dt
+    y_wheel[0] = y_wheel0
+    v_wheel[0] = v_wheel0
     y_car[0] = y_car0
     v_car[0] = v_car0
     f_ground[0] = gravity
@@ -162,10 +166,6 @@ def simulate(road_surface, spring_damping):
     # Iterates through dt and calculates the displacement of the car
 
     for i in range(1, int(sim_t / dt) + 1):
-        v_wheel[i] = (y_wheel[i] - y_wheel[i - 1]) / dt
-
-        a_wheel[i] = (v_wheel[i] - v_wheel[i - 1]) / dt
-
         f_wheel_spring[i] = -SPRING_K * y_wheel[i]
         f_ground[i] = gravity + f_wheel_spring[i]
 
@@ -173,9 +173,17 @@ def simulate(road_surface, spring_damping):
             y_car[i - 1] - y_wheel[i - 1]
         ) - spring_damping / CAR_MASS * (v_car[i - 1] - v_wheel[i - 1])
 
+        a_wheel = (
+            spring_damping / WHEEL_MASS * (v_car[i - 1] - v_wheel[i - 1])
+            + SPRING_K / WHEEL_MASS * (y_car[i - 1] - y_wheel[i - 1])
+            - tire_k / WHEEL_MASS * (y_wheel[i - 1] - y_road[i - 1])
+        )
+
         v_car[i] = v_car[i - 1] + a_car * dt
+        v_wheel[i] = v_wheel[i - 1] + a_wheel * dt
 
         y_car[i] = y_car[i - 1] + v_car[i] * dt
+        y_wheel[i] = y_wheel[i - 1] + v_wheel[i] * dt
 
         # Restricts string to max and min lengths
 
@@ -183,10 +191,10 @@ def simulate(road_surface, spring_damping):
             y_car[i] = y_wheel[i] + (SPRING_MAX - SPRING_EQ)
         if y_car[i] < y_wheel[i] - (SPRING_EQ - SPRING_MIN):
             y_car[i] = y_wheel[i] - (SPRING_EQ - SPRING_MIN)
-    return y_car, f_ground
+    return y_wheel, y_car, f_ground
 
 
-def spring_compression(y_car, wheel_position):
+def spring_compression(y_car, y_wheel):
     """
     Calculates the length of the spring at each time step.
 
@@ -194,8 +202,7 @@ def spring_compression(y_car, wheel_position):
     :param wheel_position: numpy array with the position of the wheel center
     :return: spring length
     """
-    wheel_center = wheel_position[:, 1]
-    spring_compression = y_car - wheel_center
+    spring_compression = y_car - y_wheel
     return spring_compression
 
 
@@ -221,7 +228,7 @@ def stabilization(spring_compression):
 ### PLOTTING DATA ###
 
 
-def plot_displacements(road_surface, wheel_position, y_car):
+def plot_displacements(road_surface, y_wheel, y_car):
     """
     Plots wheel position, road surface and car displacement relative to travel time.
 
@@ -231,7 +238,7 @@ def plot_displacements(road_surface, wheel_position, y_car):
     :return: graph of road, wheel and car positions over time
     """
     plt.plot(time, road_surface[:, 1], "r--", label="Road surface")
-    plt.plot(time, wheel_position[:, 1], "b", label="Wheel displacement")
+    plt.plot(time, y_wheel, "b", label="Wheel displacement")
     plt.plot(time, y_car, "g", label="Car displacement")
     plt.xlabel("Time (s)")
     plt.ylabel("Vertical position (m)")
@@ -278,15 +285,34 @@ def plot_force(f_ground):
 
 
 if __name__ == "__main__":
+    # Tests what is the damping coefficient that minimizes stabilization time
+    # using 1 bump
+
+    road_surface = create_road(dx, 1)
+
+    spring_damping = np.arange(100.0, 20000.0, 100.0)
+    best_damping = None
+    low_stabilization_time = float("inf")
+    for i in spring_damping:
+        y_wheel, y_car, f_ground = simulate(road_surface, i, TIRE_K)
+        y_wheel += WHEEL_R
+        y_car += WHEEL_R + SPRING_EQ
+        spring_comp = spring_compression(y_car, y_wheel)
+
+        stabilization_time = stabilization(spring_comp)
+
+        if best_damping == None or stabilization_time < low_stabilization_time:
+            best_damping = i
+            low_stabilization_time = stabilization_time
+
     # Plots data using the best damping coefficient and the selected number of bumps
 
-    print("Best damping coefficient:", SPRING_DAMPING, "Ns/m")
+    print("Best damping coefficient:", best_damping, "Ns/m")
     road_surface = create_road(dx, n_bumps)
-    wheel_position = np.copy(road_surface)
-    wheel_position[:, 1] = road_surface[:, 1] + WHEEL_R
-    y_car, f_ground = simulate(road_surface, SPRING_DAMPING)
+    y_wheel, y_car, f_ground = simulate(road_surface, best_damping, TIRE_K)
+    y_wheel += WHEEL_R
     y_car += WHEEL_R + SPRING_EQ
-    spring_compression = spring_compression(y_car, wheel_position)
-    plot_displacements(road_surface, wheel_position, y_car)
+    spring_compression = spring_compression(y_car, y_wheel)
+    plot_displacements(road_surface, y_wheel, y_car)
     plot_spring_compression(spring_compression)
     plot_force(f_ground)

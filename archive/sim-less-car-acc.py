@@ -26,7 +26,7 @@ GRAVITY_ACC = -9.81
 
 v_kmh = 20
 dx = 0.001
-n_bumps = 1
+n_bumps = 3
 
 ### INITIAL CALCULATIONS ###
 
@@ -151,6 +151,7 @@ def simulate(road_surface, spring_damping):
     f_ground = np.zeros_like(y_wheel)
     y_car = np.zeros_like(y_wheel)
     v_car = np.zeros_like(y_wheel)
+    a_car = np.zeros_like(y_wheel)
 
     gravity = (CAR_MASS + WHEEL_MASS) * GRAVITY_ACC
 
@@ -169,11 +170,11 @@ def simulate(road_surface, spring_damping):
         f_wheel_spring[i] = -SPRING_K * y_wheel[i]
         f_ground[i] = gravity + f_wheel_spring[i]
 
-        a_car = -SPRING_K / CAR_MASS * (
+        a_car[i] = -SPRING_K / CAR_MASS * (
             y_car[i - 1] - y_wheel[i - 1]
         ) - spring_damping / CAR_MASS * (v_car[i - 1] - v_wheel[i - 1])
 
-        v_car[i] = v_car[i - 1] + a_car * dt
+        v_car[i] = v_car[i - 1] + a_car[i] * dt
 
         y_car[i] = y_car[i - 1] + v_car[i] * dt
 
@@ -183,7 +184,7 @@ def simulate(road_surface, spring_damping):
             y_car[i] = y_wheel[i] + (SPRING_MAX - SPRING_EQ)
         if y_car[i] < y_wheel[i] - (SPRING_EQ - SPRING_MIN):
             y_car[i] = y_wheel[i] - (SPRING_EQ - SPRING_MIN)
-    return y_car, f_ground
+    return y_car, f_ground, a_car
 
 
 def spring_compression(y_car, wheel_position):
@@ -199,23 +200,8 @@ def spring_compression(y_car, wheel_position):
     return spring_compression
 
 
-def stabilization(spring_compression):
-    """
-    Calculates the time it takes to stabilize an oscillation after passing one
-    bump.
-
-    :param spring_compression: spring length
-    :return: time it takes to stabilize the oscillation
-    """
-    amp = np.abs(spring_compression - SPRING_EQ)
-    max_amp = np.max(np.abs(amp))
-    stability_condition = 0.05 * max_amp
-
-    stabilization_time = 0
-    for i in range(0, len(amp)):
-        if amp[i] > stability_condition:
-            stabilization_time = (i + 1) * dt
-    return stabilization_time
+def stabilization(a_car):
+    pass
 
 
 ### PLOTTING DATA ###
@@ -279,25 +265,24 @@ def plot_force(f_ground):
 
 if __name__ == "__main__":
     # Tests what is the damping coefficient that minimizes stabilization time
-    # using 1 bump
 
-    road_surface = create_road(dx, 1)
+    road_surface = create_road(dx, n_bumps)
     wheel_position = np.copy(road_surface)
     wheel_position[:, 1] = road_surface[:, 1] + WHEEL_R
 
     spring_damping = np.arange(100.0, 100000.0, 100.0)
     best_damping = None
-    low_stabilization_time = float("inf")
+    lowest_sum = float("inf")
     for i in spring_damping:
-        y_car, f_ground = simulate(road_surface, i)
+        y_car, f_ground, a_car = simulate(road_surface, i)
         y_car += WHEEL_R + SPRING_EQ
         spring_comp = spring_compression(y_car, wheel_position)
 
-        stabilization_time = stabilization(spring_comp)
+        stabilization_condition = np.sum(a_car)
 
-        if best_damping == None or stabilization_time < low_stabilization_time:
+        if best_damping == None or stabilization_condition < lowest_sum:
             best_damping = i
-            low_stabilization_time = stabilization_time
+            lowest_sum = stabilization_condition
 
     # Plots data using the best damping coefficient and the selected number of bumps
 
@@ -305,7 +290,9 @@ if __name__ == "__main__":
     road_surface = create_road(dx, n_bumps)
     wheel_position = np.copy(road_surface)
     wheel_position[:, 1] = road_surface[:, 1] + WHEEL_R
-    y_car, f_ground = simulate(road_surface, best_damping)
+    y_car, f_ground, a_car = simulate(
+        road_surface, SPRING_DAMPING
+    )  # Constant SPRING_DAMPING is used. To activate constant decision algorithm swap with best_damping
     y_car += WHEEL_R + SPRING_EQ
     spring_compression = spring_compression(y_car, wheel_position)
     plot_displacements(road_surface, wheel_position, y_car)

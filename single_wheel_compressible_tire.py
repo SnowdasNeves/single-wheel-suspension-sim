@@ -1,10 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-### DEFINING CONSTANTS ###
-
-### ALL THE CONSTANTS ARE DEFINED IN SI UNITS ###
-
 WHEEL_R = 0.329
 WHEEL_MASS = 23
 CAR_MASS = 350
@@ -20,37 +16,19 @@ BUMP_CENTER_2 = 6
 BUMP_CENTER_3 = 9
 BUMP_DISTANCE_TO_SURFACE = 0.5
 SIM_DISTANCE = 65
-
 GRAVITY_ACC = -9.81
-
-### ROAD SIMULATION PARAMETERS ###
 
 v_kmh = 20
 dx = 0.001
 n_bumps = 3
 
-### INITIAL CALCULATIONS ###
-
 
 def velocity_in_ms(v_kmh):
-    """
-    Converts velocity from km/h to m/s.
-
-    :param v_kmh: car velocity in km/h
-    :return: car velocity in m/s
-    """
     v_ms = v_kmh / 3.6
     return v_ms
 
 
 def sim_time(v_ms, dx):
-    """
-    Calculates simulation time and time between interations.
-
-    :param v_ms: car velocity in m/s
-    :param dx: lenght traveled with each iteration
-    :return: simulation time and time between interations
-    """
     dt = dx / v_ms
     sim_time = SIM_DISTANCE / v_ms
     return dt, sim_time
@@ -60,13 +38,6 @@ def sim_time(v_ms, dx):
 
 
 def create_road(dx, n_bumps):
-    """
-    Creates the road surface based on the given bump parameters.
-
-    :param dx: lenght traveled with each iteration
-    :param bump_center: center of the bump to be used in the current iteration
-    :return: array containing the coordenates of the road surface
-    """
     v_ms = velocity_in_ms(v_kmh)
     dt, sim_t = sim_time(v_ms, dx)
     road_surface = np.zeros((int(sim_t / dt) + 1, 2))
@@ -91,11 +62,6 @@ def create_road(dx, n_bumps):
 
 
 def used_bump(x):
-    """Defines which bump is used for wheel to road contact calculation.
-
-    :param x: position of the current iteration
-    :return: center of the bump to be used in the current iteration
-    """
     if x < 4.5:
         bump_center = BUMP_CENTER_1
     elif x >= 4.5 and x < 7.5 and n_bumps > 1:
@@ -108,13 +74,6 @@ def used_bump(x):
 
 
 def solve_position_equation(x, bump_center):
-    """
-    Calculates y position of road surface for bump geometry.
-
-    :param x: position of the current iteration
-    :param bump_center: center of the bump to be used in the current iteration
-    :return: y position
-    """
     eq_discriminant = BUMP_R**2 - (x - bump_center) ** 2
     if eq_discriminant >= 0:
         if np.sqrt(eq_discriminant) - 0.5 > 0:
@@ -136,17 +95,8 @@ v_wheel0 = 0.0
 y_car0 = 0.0
 v_car0 = 0.0
 
-### SIMULATION FUNCTIONS ###
-
 
 def simulate(road_surface, spring_damping, tire_k):
-    """
-    Uses the Euler-Cromer method to simulate the displacement of the car given
-    the wheel displacement and system characteristics.
-
-    :param road_surface: array containing the coordenates of the road surface
-    :return: vertical position of the center of the car
-    """
     y_road = road_surface[:, 1]
     y_wheel = np.zeros_like(y_road)
     v_wheel = np.zeros_like(y_road)
@@ -195,25 +145,11 @@ def simulate(road_surface, spring_damping, tire_k):
 
 
 def spring_compression(y_car, y_wheel):
-    """
-    Calculates the length of the spring at each time step.
-
-    :param y_car: vertical position of the center of the car
-    :param wheel_position: numpy array with the position of the wheel center
-    :return: spring length
-    """
     spring_compression = y_car - y_wheel
     return spring_compression
 
 
 def stabilization(spring_compression):
-    """
-    Calculates the time it takes to stabilize an oscillation after passing one
-    bump.
-
-    :param spring_compression: spring length
-    :return: time it takes to stabilize the oscillation
-    """
     amp = np.abs(spring_compression - SPRING_EQ)
     max_amp = np.max(np.abs(amp))
     stability_condition = 0.05 * max_amp
@@ -225,18 +161,7 @@ def stabilization(spring_compression):
     return stabilization_time
 
 
-### PLOTTING DATA ###
-
-
 def plot_displacements(road_surface, y_wheel, y_car):
-    """
-    Plots wheel position, road surface and car displacement relative to travel time.
-
-    :param wheel_position: numpy array with the position of the wheel center
-    :param road_surface: numpy array with the position of the road surface
-    :param y_car: vertical position of the center of the car
-    :return: graph of road, wheel and car positions over time
-    """
     plt.plot(time, road_surface[:, 1], "r--", label="Road surface")
     plt.plot(time, y_wheel, "b", label="Wheel displacement")
     plt.plot(time, y_car, "g", label="Car displacement")
@@ -249,13 +174,6 @@ def plot_displacements(road_surface, y_wheel, y_car):
 
 
 def plot_spring_compression(spring_compression):
-    """
-    Plots spring compression. The lower the value in yy, the more compressed the
-    spring is.
-
-    :param spring_compression: spring length
-    :return: graph of spring length over time
-    """
     plt.plot(time, spring_compression, "m", label="Spring compression")
     plt.xlabel("Time (s)")
     plt.ylabel("Vertical position (m)")
@@ -266,12 +184,6 @@ def plot_spring_compression(spring_compression):
 
 
 def plot_force(f_ground):
-    """
-    Plots the force applied by the wheel on the ground.
-
-    :param force: force applied to the ground on each iteration
-    :return: graph of force applied over time
-    """
     plt.plot(time, f_ground, "c", label="Force applied")
     plt.xlabel("Time (s)")
     plt.ylabel("Force (N)")
@@ -281,13 +193,7 @@ def plot_force(f_ground):
     plt.show()
 
 
-### PROGRAM INITIALIZATION ###
-
-
 if __name__ == "__main__":
-    # Tests what is the damping coefficient that minimizes stabilization time
-    # using 1 bump
-
     road_surface = create_road(dx, 1)
 
     spring_damping = np.arange(100.0, 20000.0, 100.0)
@@ -301,11 +207,9 @@ if __name__ == "__main__":
 
         stabilization_time = stabilization(spring_comp)
 
-        if best_damping == None or stabilization_time < low_stabilization_time:
+        if best_damping is None or stabilization_time < low_stabilization_time:
             best_damping = i
             low_stabilization_time = stabilization_time
-
-    # Plots data using the best damping coefficient and the selected number of bumps
 
     print("Best damping coefficient:", best_damping, "Ns/m")
     road_surface = create_road(dx, n_bumps)
